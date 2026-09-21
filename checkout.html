@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ur">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Checkout — WK Online Mart</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="header-row">
+    <a href="index.html" class="brand">WK <span>Online Mart</span></a>
+  </div>
+</header>
+
+<main class="wrap" style="max-width:640px">
+  <div id="checkoutArea">
+    <p style="margin-top:30px;color:var(--ink-soft)">Loading...</p>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<script src="common.js"></script>
+<script>
+let cartRows = [];
+let profileData = null;
+
+async function initCheckout() {
+  const area = document.getElementById("checkoutArea");
+  const user = await requireCustomerAuth();
+  if (!user) return;
+
+  const { data: cart } = await supabaseClient.from("cart_items").select("*, products(*)").eq("user_id", user.id);
+  cartRows = cart || [];
+  if (cartRows.length === 0) {
+    area.innerHTML = `<div class="empty-state">Cart khali hai. <a href="index.html">Shopping karein &rarr;</a></div>`;
+    return;
+  }
+
+  const { data: profile } = await supabaseClient.from("profiles").select("*").eq("id", user.id).maybeSingle();
+  profileData = profile;
+
+  const total = cartRows.reduce((s, r) => s + r.products.price * r.quantity, 0);
+  const itemsHtml = cartRows.map(r => `
+    <div class="order-line"><span>${esc(r.products.name)} x${r.quantity}</span><span>${fmtPrice(r.products.price * r.quantity)}</span></div>
+  `).join("");
+
+  area.innerHTML = `
+    <div class="section-title"><h2>Checkout</h2></div>
+    <div class="order-card">${itemsHtml}
+      <div class="order-line" style="font-weight:700;border-top:1px solid var(--line);margin-top:8px;padding-top:8px">
+        <span>Total</span><span>${fmtPrice(total)}</span>
+      </div>
+    </div>
+    <form id="checkoutForm" class="form-card" style="margin:24px 0">
+      <h1 style="font-size:1.2rem">Delivery Details</h1>
+      <div class="field">
+        <label>Pura Naam</label>
+        <input type="text" id="custName" value="${esc(profile?.full_name || "")}" required>
+      </div>
+      <div class="field">
+        <label>Phone Number</label>
+        <input type="tel" id="custPhone" value="${esc(profile?.phone || "")}" required>
+      </div>
+      <div class="field">
+        <label>Pura Address</label>
+        <textarea id="custAddress" required>${esc(profile?.address || "")}</textarea>
+      </div>
+      <button type="submit" class="btn btn-wine btn-block">Order Place Karein (Cash on Delivery)</button>
+      <div id="coMsg" class="form-msg"></div>
+    </form>
+  `;
+
+  document.getElementById("checkoutForm").addEventListener("submit", placeOrder);
+}
+
+async function placeOrder(e) {
+  e.preventDefault();
+  const msg = document.getElementById("coMsg");
+  const btn = e.target.querySelector("button[type=submit]");
+  btn.disabled = true; btn.textContent = "Order place ho raha hai...";
+
+  const user = await getCurrentUser();
+  const name = document.getElementById("custName").value.trim();
+  const phone = document.getElementById("custPhone").value.trim();
+  const address = document.getElementById("custAddress").value.trim();
+
+  const items = cartRows.map(r => ({ product_id: r.product_id, quantity: r.quantity }));
+
+  // Order database function ke zariye place hota hai (price/stock server-side handle hota hai)
+  const { data: result, error: orderErr } = await supabaseClient.rpc("place_order", {
+    p_items: items,
+    p_phone: phone,
+    p_address: address,
+    p_full_name: name
+  });
+
+  if (orderErr) {
+    msg.textContent = "Order place nahi ho saka: " + orderErr.message;
+    msg.classList.add("error");
+    btn.disabled = false; btn.textContent = "Order Place Karein (Cash on Delivery)";
+    return;
+  }
+
+  const orderItemsForWA = cartRows.map(r => ({
+    product_name: r.products.name, price: r.products.price, quantity: r.quantity
+  }));
+
+  const waLink = buildWhatsAppLink({
+    order_number: result.order_number,
+    total_amount: result.total_amount,
+    customer_name: name,
+    phone,
+    shipping_address: address
+  }, orderItemsForWA);
+
+  sessionStorage.setItem("lastOrderNumber", result.order_number);
+  sessionStorage.setItem("lastOrderWA", waLink);
+  window.location.href = "order-success.html";
+}
+
+initCheckout();
+</script>
+</body>
+</html>

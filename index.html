@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ur" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WK Online Mart — Dresses, Shoes &amp; Cosmetics</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="topbar">Pure Pakistan mein Cash on Delivery available</div>
+
+<header class="site-header">
+  <div class="header-row">
+    <a href="index.html" class="brand">WK <span>Online Mart</span></a>
+    <form id="searchForm" class="search-box" role="search">
+      <input id="searchInput" type="text" placeholder="Products talaash karein...">
+      <button type="submit">Search</button>
+    </form>
+    <div class="header-actions">
+      <a id="accountLink" class="icon-link" href="login.html" title="Account">👤</a>
+      <a class="icon-link" href="cart.html" title="Cart">🛒<span id="cartCount" class="cart-count" style="display:none">0</span></a>
+      <a class="admin-mini" href="admin-login.html">Admin</a>
+    </div>
+  </div>
+  <nav class="cat-nav">
+    <div class="wrap" id="categoryNav">
+      <a href="index.html" data-cat="">Sab Products</a>
+    </div>
+  </nav>
+</header>
+
+<section class="hero">
+  <div class="wrap">
+    <div class="hero-copy">
+      <h1>Style jo aap ko suit kare</h1>
+      <p>Dresses, shoes aur cosmetics — sab ek jagah, ghar baithe order karein, cash on delivery ke sath.</p>
+      <div class="hero-cats" id="heroCats"></div>
+    </div>
+  </div>
+</section>
+
+<main class="wrap">
+  <div class="section-title">
+    <h2 id="gridTitle">Naye Products</h2>
+  </div>
+  <div class="grid" id="productGrid">
+    <p style="color:var(--ink-soft)">Loading products...</p>
+  </div>
+</main>
+
+<footer>
+  &copy; 2026 WK Online Mart. Sab rights reserved.
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<script src="common.js"></script>
+<script>
+async function loadCategories(activeSlug) {
+  const { data: cats } = await supabaseClient.from("categories").select("*").order("name");
+  const nav = document.getElementById("categoryNav");
+  const heroCats = document.getElementById("heroCats");
+  (cats || []).forEach(c => {
+    const a1 = document.createElement("a");
+    a1.href = "index.html?cat=" + encodeURIComponent(c.slug);
+    a1.textContent = c.name;
+    if (c.slug === activeSlug) a1.classList.add("active");
+    nav.appendChild(a1);
+
+    const a2 = document.createElement("a");
+    a2.href = "index.html?cat=" + encodeURIComponent(c.slug);
+    a2.textContent = c.name;
+    heroCats.appendChild(a2);
+  });
+}
+
+function productCard(p) {
+  const img = p.image_url || "https://placehold.co/400x520?text=WK+Mart";
+  const outOfStock = p.stock <= 0;
+  return `
+    <div class="card">
+      <a href="product.html?id=${p.id}" class="card-img"><img src="${img}" alt="${esc(p.name)}"></a>
+      <div class="card-body">
+        <div class="card-cat">${esc(p.categories ? p.categories.name : "")}</div>
+        <div class="card-name"><a href="product.html?id=${p.id}">${esc(p.name)}</a></div>
+        <div class="card-price">${fmtPrice(p.price)}</div>
+        <div class="card-stock ${outOfStock ? "out" : ""}">${outOfStock ? "Stock khatam" : p.stock + " available"}</div>
+        <a href="product.html?id=${p.id}" class="btn btn-outline btn-sm" style="margin-top:8px">Dekhein</a>
+      </div>
+    </div>`;
+}
+
+async function loadProducts() {
+  const params = new URLSearchParams(location.search);
+  const q = params.get("q");
+  const catSlug = params.get("cat");
+  const grid = document.getElementById("productGrid");
+  const title = document.getElementById("gridTitle");
+
+  let query = supabaseClient
+    .from("products")
+    .select("*, categories(name, slug)")
+    .eq("is_active", true)
+    .order("created_at", { ascending: false });
+
+  if (q) {
+    title.textContent = `"${q}" ke natayej`;
+    query = query.ilike("name", `%${q}%`);
+  } else if (catSlug) {
+    const { data: cat } = await supabaseClient.from("categories").select("id,name").eq("slug", catSlug).maybeSingle();
+    if (cat) {
+      title.textContent = cat.name;
+      query = query.eq("category_id", cat.id);
+    }
+  } else {
+    title.textContent = "Naye Products";
+  }
+
+  const { data, error } = await query;
+  if (error) { grid.innerHTML = `<p>Products load nahi ho sake.</p>`; return; }
+  if (!data || data.length === 0) {
+    grid.innerHTML = `<div class="empty-state">Koi product nahi mila.</div>`;
+    return;
+  }
+  grid.innerHTML = data.map(productCard).join("");
+}
+
+(async function init() {
+  const params = new URLSearchParams(location.search);
+  await loadCategories(params.get("cat"));
+  await loadProducts();
+})();
+</script>
+</body>
+</html>

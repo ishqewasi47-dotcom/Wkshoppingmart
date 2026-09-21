@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ur">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin Login — WK Online Mart</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body style="background:var(--ink)">
+<div class="form-card" style="margin-top:100px">
+  <h1>Admin Login</h1>
+  <p class="form-sub">WK Online Mart admin panel.</p>
+  <form id="adminLoginForm">
+    <div class="field"><label>Email</label><input type="email" id="email" required></div>
+    <div class="field"><label>Password</label><input type="password" id="password" required></div>
+    <button type="submit" class="btn btn-wine btn-block">Login</button>
+    <div id="msg" class="form-msg"></div>
+  </form>
+  <div class="form-alt"><a href="index.html">&larr; Website par wapas jayein</a></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<script src="common.js"></script>
+<script>
+document.getElementById("adminLoginForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const msg = document.getElementById("msg");
+  msg.textContent = ""; msg.className = "form-msg";
+
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value;
+
+  const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  if (error) { msg.textContent = error.message; msg.classList.add("error"); return; }
+
+  const admin = await isAdminUser(data.user.id);
+  if (!admin) {
+    await supabaseClient.auth.signOut();
+    msg.textContent = "Yeh account admin nahi hai.";
+    msg.classList.add("error");
+    return;
+  }
+  window.location.href = "admin-index.html";
+});
+</script>
+</body>
+</html>

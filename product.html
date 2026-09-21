@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ur">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Product — WK Online Mart</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="header-row">
+    <a href="index.html" class="brand">WK <span>Online Mart</span></a>
+    <form id="searchForm" class="search-box" role="search">
+      <input id="searchInput" type="text" placeholder="Products talaash karein...">
+      <button type="submit">Search</button>
+    </form>
+    <div class="header-actions">
+      <a id="accountLink" class="icon-link" href="login.html" title="Account">👤</a>
+      <a class="icon-link" href="cart.html" title="Cart">🛒<span id="cartCount" class="cart-count" style="display:none">0</span></a>
+      <a class="admin-mini" href="admin-login.html">Admin</a>
+    </div>
+  </div>
+</header>
+
+<main class="wrap" id="pdMain">
+  <p style="margin-top:30px;color:var(--ink-soft)">Loading...</p>
+</main>
+
+<footer>&copy; 2026 WK Online Mart.</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<script src="common.js"></script>
+<script>
+const productId = new URLSearchParams(location.search).get("id");
+
+async function loadProduct() {
+  const main = document.getElementById("pdMain");
+  if (!productId) { main.innerHTML = "<p>Product nahi mila.</p>"; return; }
+
+  const { data: p, error } = await supabaseClient
+    .from("products")
+    .select("*, categories(name, slug)")
+    .eq("id", productId)
+    .maybeSingle();
+
+  if (error || !p) { main.innerHTML = "<p>Product nahi mila.</p>"; return; }
+
+  const outOfStock = p.stock <= 0;
+  const img = p.image_url || "https://placehold.co/500x650?text=WK+Mart";
+
+  main.innerHTML = `
+    <div class="pd-wrap">
+      <div class="pd-img"><img src="${img}" alt="${esc(p.name)}"></div>
+      <div class="pd-info">
+        <div class="card-cat">${esc(p.categories ? p.categories.name : "")}</div>
+        <h1>${esc(p.name)}</h1>
+        <div class="pd-price">${fmtPrice(p.price)}</div>
+        <div class="pd-meta">Manufacturer: ${esc(p.manufacturer || "—")} &nbsp;•&nbsp; ${outOfStock ? '<span style="color:var(--danger)">Stock khatam</span>' : p.stock + " stock available"}</div>
+        <p class="pd-desc">${esc(p.description || "")}</p>
+        <div class="qty-row">
+          <label>Quantity:</label>
+          <input type="number" id="qtyInput" value="1" min="1" max="${p.stock}" ${outOfStock ? "disabled" : ""}>
+        </div>
+        <button id="addToCartBtn" class="btn btn-wine" ${outOfStock ? "disabled" : ""}>
+          ${outOfStock ? "Stock Khatam" : "Cart Mein Add Karein"}
+        </button>
+        <div id="pdMsg" class="form-msg"></div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById("addToCartBtn")?.addEventListener("click", async () => {
+    const user = await getCurrentUser();
+    if (!user) { window.location.href = "login.html?redirect=product.html?id=" + productId; return; }
+
+    const qty = Math.max(1, parseInt(document.getElementById("qtyInput").value || "1"));
+    const msg = document.getElementById("pdMsg");
+
+    const { data: existing } = await supabaseClient
+      .from("cart_items").select("*").eq("user_id", user.id).eq("product_id", productId).maybeSingle();
+
+    if (existing) {
+      await supabaseClient.from("cart_items").update({ quantity: existing.quantity + qty }).eq("id", existing.id);
+    } else {
+      await supabaseClient.from("cart_items").insert({ user_id: user.id, product_id: productId, quantity: qty });
+    }
+    msg.textContent = "Cart mein add ho gaya.";
+    msg.className = "form-msg success";
+    refreshCartCount();
+  });
+}
+
+loadProduct();
+</script>
+</body>
+</html>

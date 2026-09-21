@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="ur">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Order Confirm — WK Online Mart</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="header-row">
+    <a href="index.html" class="brand">WK <span>Online Mart</span></a>
+  </div>
+</header>
+
+<div class="form-card" style="text-align:center">
+  <h1 style="color:var(--success)">Order Kamyabi se Place ho gaya!</h1>
+  <p class="form-sub">Order Number: <strong id="ordNum"></strong></p>
+  <p>Confirmation ke liye apni order details WhatsApp par forward karein.</p>
+  <a id="waBtn" href="#" target="_blank" class="btn btn-wine btn-block" style="margin-top:10px">WhatsApp par Confirm Karein</a>
+  <a href="dashboard.html" class="btn btn-outline btn-block" style="margin-top:10px">Mere Orders Dekhein</a>
+</div>
+
+<script>
+document.getElementById("ordNum").textContent = sessionStorage.getItem("lastOrderNumber") || "—";
+document.getElementById("waBtn").href = sessionStorage.getItem("lastOrderWA") || "#";
+</script>
+</body>
+</html>
